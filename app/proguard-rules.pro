@@ -1,0 +1,4 @@
+-dontwarn **
+-optimizationpasses 5
+-allowaccessmodification
+-repackageclasses ''

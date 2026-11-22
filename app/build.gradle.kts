@@ -74,9 +74,13 @@ kotlin {
 }
 
 dependencies {
-    // Expressive APIs were removed from material3 1.4.0 stable and live in 1.5.0 pre-releases.
-    // ui and foundation arrive transitively at matching versions, so no BOM here.
-    implementation("androidx.compose.material3:material3:1.5.0-rc01")
+    // Stable material3 1.4.0 (needs AGP 8.x, compileSdk 36). Expressive component APIs were
+    // removed from stable and 1.5.x needs AGP 9 + compileSdk 37, so the expressive look is
+    // done with shapes, spring motion and dynamic colour instead.
+    implementation(platform("androidx.compose:compose-bom:2025.09.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }

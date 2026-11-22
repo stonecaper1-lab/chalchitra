@@ -8,7 +8,7 @@ spend less time scrolling and more time pretending you chose that sunset yoursel
 ## What it does
 
 - **Tiny.** No Coil, Retrofit, WorkManager or other "essential" libraries. Android already ships HTTP, JSON and a job scheduler. Revolutionary.
-- **Material 3 Expressive.** Dynamic colour, springy motion, pure-black AMOLED dark theme.
+- **Expressive look.** Dynamic colour, chunky rounded corners, bouncy press animations, pure-black AMOLED dark theme. Not the official expressive components: those need AGP 9 and compileSdk 37, so we faked it with taste.
 - **Sources:** Bing daily, r/MobileWallpaper, r/phonewallpapers, r/iWallpaper, r/Amoledbackgrounds, r/Verticalwallpapers, r/androidthemes, r/Homescreens, r/AnimePhoneWallpapers, r/MinimalWallpaper, r/EarthPorn, r/SpacePorn. No live wallpapers: video loops are a battery tax, and we're against taxes.
 - **Auto changer.** One `JobScheduler` job, every 15 min to 24 h, only with network and battery not low. Zero services running while you aren't looking.
 - **Status bar dim.** A soft gradient baked into the wallpaper top, so the clock survives your questionable taste in bright skies.

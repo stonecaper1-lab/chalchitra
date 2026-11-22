@@ -5,7 +5,13 @@ import android.graphics.BitmapFactory
 import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,12 +43,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -67,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -114,7 +120,7 @@ fun Root() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     var srcId by rememberSaveable { mutableStateOf(Sources.all[0].id) }
@@ -218,12 +224,20 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
             ) {
                 itemsIndexed(items, key = { _, w -> w.id }) { i, w ->
                     if (i >= items.size - 6) LaunchedEffect(items.size) { more() }
+                    val press = remember { MutableInteractionSource() }
+                    val pressed by press.collectIsPressedAsState()
+                    val scale by animateFloatAsState(
+                        if (pressed) 0.93f else 1f,
+                        spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
+                        label = "press",
+                    )
                     Box(
                         Modifier
+                            .graphicsLayer { scaleX = scale; scaleY = scale }
                             .aspectRatio(9f / 16f)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(24.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable { onOpen(w) },
+                            .clickable(interactionSource = press, indication = LocalIndication.current) { onOpen(w) },
                     ) {
                         val bm by produceState<Bitmap?>(null, w.thumb) { value = Thumbs.get(w.thumb) }
                         bm?.let {
@@ -239,7 +253,7 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
                 if (loading) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            LoadingIndicator()
+                            CircularProgressIndicator()
                         }
                     }
                 }
@@ -259,7 +273,6 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Detail(w: Wall, onClose: () -> Unit) {
     val ctx = LocalContext.current
@@ -343,7 +356,7 @@ fun Detail(w: Wall, onClose: () -> Unit) {
             when {
                 failed != null -> Text(failed!!, color = Color.White)
                 busy || raw == null -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoadingIndicator()
+                    CircularProgressIndicator()
                 }
                 else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilledTonalButton(onClick = { set(0) }, modifier = Modifier.weight(1f)) { Text("Home") }

@@ -15,7 +15,7 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putInt("iv", v).apply()
 
     var sources: Set<String>
-        get() = sp.getStringSet("src", null)?.toSet() ?: setOf("bing", "Amoledbackgrounds")
+        get() = sp.getStringSet("src", null)?.toSet() ?: setOf("bing", "wh-dark")
         set(v) = sp.edit().putStringSet("src", v).apply()
 
     /** 0 = home, 1 = lock, 2 = both. */

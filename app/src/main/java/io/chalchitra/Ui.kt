@@ -98,7 +98,14 @@ object Thumbs {
             cache.get(url) ?: withContext(Dispatchers.IO) {
                 try {
                     val b = Net.bytes(url)
-                    val o = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(b, 0, b.size, bounds)
+                    var s = 1
+                    while (bounds.outWidth / (s * 2) >= 360) s *= 2
+                    val o = BitmapFactory.Options().apply {
+                        inSampleSize = s
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                    }
                     BitmapFactory.decodeByteArray(b, 0, b.size, o)?.also { cache.put(url, it) }
                 } catch (_: Exception) {
                     null

@@ -7,24 +7,33 @@ import java.net.URL
 
 object Net {
     private const val UA = "android:io.chalchitra:1.0 (FOSS wallpaper app)"
+    const val BROWSER_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
 
-    private fun open(url: String): HttpURLConnection {
+    private fun open(url: String, ua: String = UA): HttpURLConnection {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000
         c.readTimeout = 20_000
-        c.setRequestProperty("User-Agent", UA)
+        c.setRequestProperty("User-Agent", ua)
+        c.setRequestProperty("Accept", "*/*")
         return c
     }
 
     private fun check(c: HttpURLConnection) {
         val code = c.responseCode
         if (code !in 200..299) {
-            throw IOException(if (code == 429 || code == 403) "Rate limited (HTTP $code), try later" else "HTTP $code")
+            throw IOException(
+                when (code) {
+                    403 -> "Server said no (HTTP 403). Try another source, there are plenty."
+                    429 -> "Slow down (HTTP 429). Try again in a minute."
+                    else -> "HTTP $code"
+                }
+            )
         }
     }
 
-    fun bytes(url: String): ByteArray {
-        val c = open(url)
+    fun bytes(url: String, ua: String = UA): ByteArray {
+        val c = open(url, ua)
         try {
             check(c)
             return c.inputStream.use { it.readBytes() }
@@ -33,7 +42,7 @@ object Net {
         }
     }
 
-    fun text(url: String): String = String(bytes(url), Charsets.UTF_8)
+    fun text(url: String, ua: String = UA): String = String(bytes(url, ua), Charsets.UTF_8)
 
     /** Streams straight to disk so big images never sit in the heap. */
     fun download(url: String, dest: File) {

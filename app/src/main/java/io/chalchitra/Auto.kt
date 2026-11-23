@@ -16,7 +16,8 @@ object Auto {
         val srcs = pr.sources.map { Sources.byId(it) }.shuffled()
         for (s in srcs) {
             try {
-                val items = Feed.load(s, Sort.WEEK, null).items
+                val cursor = if (Feed.isPaged(s.kind)) (1..8).random().toString() else null
+                val items = Feed.load(s, Sort.WEEK, cursor).items
                 if (items.isEmpty()) continue
                 val pick = items.filter { !pr.isSeen(it.id) }.ifEmpty { items }.random()
                 val bmp = Engine.render(ctx, pick.full)

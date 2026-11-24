@@ -23,6 +23,10 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("tg", 2)
         set(v) = sp.edit().putInt("tg", v).apply()
 
+    var showReddit: Boolean
+        get() = sp.getBoolean("rd", false)
+        set(v) = sp.edit().putBoolean("rd", v).apply()
+
     var dimOn: Boolean
         get() = sp.getBoolean("dim", true)
         set(v) = sp.edit().putBoolean("dim", v).apply()

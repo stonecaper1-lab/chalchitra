@@ -25,6 +25,7 @@ object Net {
             throw IOException(
                 when (code) {
                     403 -> "Server said no (HTTP 403). Try another source, there are plenty."
+                    404 -> "Not found (HTTP 404). That repo or page may be gone."
                     429 -> "Slow down (HTTP 429). Try again in a minute."
                     else -> "HTTP $code"
                 }

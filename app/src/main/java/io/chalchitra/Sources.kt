@@ -40,7 +40,21 @@ object Sources {
         Source("gh-sc-anime", "Scopic anime", Kind.GITHUB, "anime/", extra = "michaelScopic/Wallpapers"),
         Source("gh-sc-cyber", "Scopic cyberpunk", Kind.GITHUB, "cyberpunk/", extra = "michaelScopic/Wallpapers"),
         Source("gh-sc-mono", "Scopic mono", Kind.GITHUB, "monochrome/", extra = "michaelScopic/Wallpapers"),
-        Source("gh-sc-abstract", "Scopic abstract", Kind.GITHUB, extra = "michaelScopic/Wallpapers|abstract/"),
+        Source("gh-dharmx", "dharmx", Kind.GITHUB, "", extra = "dharmx/walls"),
+        Source("gh-joydeep", "Joydeep", Kind.GITHUB, "", extra = "JoydeepMallick/Wallpapers"),
+        Source("gh-ml4w", "ML4W", Kind.GITHUB, "", extra = "mylinuxforwork/wallpaper"),
+        Source("gh-themed", "Themed", Kind.GITHUB, "", extra = "yukazakiri/themed-wallpapers"),
+        Source("gh-mocha", "Catppuccin mocha", Kind.GITHUB, "", extra = "orangci/walls-catppuccin-mocha"),
+        Source("gh-wallz", "Wallz", Kind.GITHUB, "", extra = "fr0st-xyz/wallz"),
+        Source("gh-vyrx", "Vyrx", Kind.GITHUB, "", extra = "vyrx-dev/Wallpapers"),
+        Source("gh-haril", "Haril", Kind.GITHUB, "", extra = "harilvfs/wallpapers"),
+        Source("gh-catppuccin", "Catppuccin", Kind.GITHUB, "", extra = "catppuccin/wallpapers"),
+        Source("gh-dracula", "Dracula", Kind.GITHUB, "", extra = "dracula/wallpaper"),
+        Source("gh-rosepine", "Rose Pine", Kind.GITHUB, "", extra = "rose-pine/wallpapers"),
+        Source("gh-nordic", "Nordic", Kind.GITHUB, "", extra = "linuxdotexe/nordic-wallpapers"),
+        Source("gh-minimal", "Minimalistic", Kind.GITHUB, "images/", extra = "DenverCoder1/minimalistic-wallpaper-collection"),
+        Source("gh-dynamic", "Dynamic", Kind.GITHUB, "Dynamic_Wallpapers/", extra = "saint-13/Linux_Dynamic_Wallpapers"),
+        Source("gh-usman", "Usman", Kind.GITHUB, "static/", extra = "usman-369/wallpapers"),
         Source("MobileWallpaper", "Mobile", Kind.REDDIT, "MobileWallpaper"),
         Source("phonewallpapers", "Phone", Kind.REDDIT, "phonewallpapers"),
         Source("iWallpaper", "iWallpaper", Kind.REDDIT, "iWallpaper"),
@@ -53,6 +67,9 @@ object Sources {
         Source("EarthPorn", "Earth", Kind.REDDIT, "EarthPorn", portrait = false),
         Source("SpacePorn", "Space", Kind.REDDIT, "SpacePorn", portrait = false),
     )
+
+    /** GitHub repo sources are grouped under one chip in the UI. */
+    val github: List<Source> get() = all.filter { it.kind == Kind.GITHUB }
 
     fun byId(id: String): Source = all.firstOrNull { it.id == id } ?: all[0]
 }

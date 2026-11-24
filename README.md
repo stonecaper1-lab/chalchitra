@@ -8,10 +8,12 @@ spend less time scrolling and more time pretending you chose that sunset yoursel
 ## What it does
 
 - **Tiny.** No Coil, Retrofit, WorkManager or other "essential" libraries. Android already ships HTTP, JSON and a job scheduler. Revolutionary.
+- **Bengali soul.** "Chalchitra" is the painted, arched backdrop behind the Durga idol, so the icon is that arch in zari gold on alta red, the palette is sindoor, gold and ivory, and the title is in Bengali script. Headings use the system serif, because bundling fonts is how apps get fat.
 - **Expressive look.** Dynamic colour, chunky rounded corners, bouncy press animations, pure-black AMOLED dark theme. Not the official expressive components: those need AGP 9 and compileSdk 37, so we faked it with taste.
-- **Sources:** Bing daily, Wallhaven (top, dark, anime), Picsum photos, NASA APOD, Art Institute of Chicago public-domain art, two GitHub wallpaper repos (D3Ext/aesthetic-wallpapers and michaelScopic/Wallpapers, in several categories), plus r/MobileWallpaper, r/phonewallpapers, r/iWallpaper, r/Amoledbackgrounds, r/Verticalwallpapers, r/androidthemes, r/Homescreens, r/AnimePhoneWallpapers, r/MinimalWallpaper, r/EarthPorn, r/SpacePorn. No live wallpapers: video loops are a battery tax, and we're against taxes.
+- **Sources:** Bing daily, Wallhaven (top, dark, anime), Picsum photos, NASA APOD, Art Institute of Chicago public-domain art, about two dozen GitHub wallpaper repos and folders (dharmx/walls, D3Ext/aesthetic-wallpapers, michaelScopic/Wallpapers, Catppuccin, Dracula, Rose Pine, Nordic and friends), plus r/MobileWallpaper, r/phonewallpapers, r/iWallpaper, r/Amoledbackgrounds, r/Verticalwallpapers, r/androidthemes, r/Homescreens, r/AnimePhoneWallpapers, r/MinimalWallpaper, r/EarthPorn, r/SpacePorn. No live wallpapers: video loops are a battery tax, and we're against taxes.
 - **Auto changer.** One `JobScheduler` job, every 15 min to 24 h, only with network and battery not low. Zero services running while you aren't looking.
 - **Status bar dim.** A soft gradient baked into the wallpaper top, so the clock survives your questionable taste in bright skies.
+- **Featured hero.** A swipeable carousel on Home mixing Bing, Wallhaven, NASA, the Art Institute and random photography, for when scrolling a grid feels like effort.
 - **Low memory.** Only the screen-sized centre crop of each image is decoded, so a 5000 px mountain doesn't eat your RAM for breakfast.
 
 ## Build
@@ -32,7 +34,7 @@ No secrets set? It signs with the debug key. It will install. It will judge you 
 
 ## Caveats
 
-- Reddit increasingly blocks anonymous clients with a 403. The app tries three hosts with a browser user agent, then gives up gracefully. That is why the non-Reddit sources exist. Thanks, Reddit.
+- Reddit increasingly blocks phones with a bot check, so Reddit sources are hidden by default. Settings has a toggle for the optimists.
 - GitHub sources list a repo once through the GitHub API (60 requests/hour, plenty) and resize images through the free wsrv.nl service, because some wallpapers weigh 45 MB and your data plan has feelings.
 - NASA APOD uses the shared `DEMO_KEY`. Put your own free key in `Feed.kt` if it gets cranky.
 - Landscape subs are centre-cropped. Your mountain may lose a peak. Mountains are resilient.

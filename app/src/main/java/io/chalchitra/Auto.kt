@@ -13,7 +13,10 @@ object Auto {
     /** Picks one new wallpaper from the enabled sources and applies it. */
     fun runOnce(ctx: Context): Boolean {
         val pr = Prefs(ctx)
-        val srcs = pr.sources.map { Sources.byId(it) }.shuffled()
+        val srcs = pr.sources.map { Sources.byId(it) }
+            .filter { pr.showReddit || it.kind != Kind.REDDIT }
+            .ifEmpty { listOf(Sources.all[0]) }
+            .shuffled()
         for (s in srcs) {
             try {
                 val cursor = Feed.startCursor(s)

@@ -2,6 +2,10 @@ package io.chalchitra
 
 import android.net.Uri
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.net.URLEncoder
 import org.json.JSONArray
 import org.json.JSONException
@@ -16,6 +20,9 @@ data class Wall(
 
 data class Page(val items: List<Wall>, val after: String?)
 
+/** One card in the Home hero carousel. [img] is a larger, already-resized preview URL. */
+data class HeroItem(val w: Wall, val tag: String, val img: String)
+
 object Feed {
     /** Free NASA demo key (rate limited). Get your own at api.nasa.gov and paste it here. */
     private const val NASA_KEY = "DEMO_KEY"
@@ -26,6 +33,11 @@ object Feed {
     private val ghTrees = HashMap<String, List<String>>()
     private val ghSeed = java.util.Random().nextLong()
     private val ghImg = Regex("\\.(jpe?g|png|webp)$", RegexOption.IGNORE_CASE)
+    /** Repo furniture that is not wallpaper. */
+    private val ghJunk = Regex(
+        "(^|/)(\\.[^/]*|assets|screenshots?|previews?|docs?|icons?|logos?|banners?)(/|$)|screenshot|preview|thumb",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun load(src: Source, sort: Sort, after: String?): Page = try {
         when (src.kind) {
@@ -39,6 +51,61 @@ object Feed {
         }
     } catch (e: JSONException) {
         throw IOException("${src.label} sent something unreadable. Try another source.")
+    }
+
+    private fun tagFor(s: Source) = when (s.kind) {
+        Kind.BING -> "Bing daily"
+        Kind.WALLHAVEN -> "Wallhaven, top of the month"
+        Kind.APOD -> "NASA, astronomy picture"
+        Kind.ARTIC -> "Art Institute of Chicago"
+        Kind.PICSUM -> "Photography"
+        else -> s.label
+    }
+
+    private fun heroImg(s: Source, w: Wall): String = when (s.kind) {
+        Kind.BING -> w.thumb.replace("_480x800", "_720x1280")
+        Kind.ARTIC -> w.thumb.replace("/full/400,", "/full/720,")
+        Kind.PICSUM -> w.thumb.replace("/360/640", "/720/1100")
+        Kind.WALLHAVEN -> wsrv(w.full)
+        Kind.APOD -> wsrv(w.thumb)
+        else -> w.thumb
+    }
+
+    private fun wsrv(url: String) =
+        "https://wsrv.nl/?w=720&h=1100&fit=cover&a=attention&output=jpg&q=75&url=" + URLEncoder.encode(url, "UTF-8")
+
+    /**
+     * Mixed hero content: Bing, Wallhaven, NASA, Art Institute and Picsum, fetched in parallel.
+     * Any source that fails is silently skipped. Bing's first image leads, tagged "Today".
+     */
+    suspend fun featured(): List<HeroItem> = coroutineScope {
+        val lists = listOf("bing" to 4, "wh" to 3, "apod" to 2, "artic" to 2, "picsum" to 2).map { (id, n) ->
+            async(Dispatchers.IO) {
+                try {
+                    val s = Sources.byId(id)
+                    val items = load(s, Sort.WEEK, startCursor(s)).items
+                    (if (s.kind == Kind.BING) items else items.shuffled())
+                        .take(n).map { w -> HeroItem(w, tagFor(s), heroImg(s, w)) }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }.awaitAll()
+        val out = ArrayList<HeroItem>()
+        var i = 0
+        while (out.size < 12) {
+            var added = false
+            for (l in lists) if (i < l.size) {
+                out += l[i]
+                added = true
+            }
+            if (!added) break
+            i++
+        }
+        if (out.isNotEmpty() && lists[0].isNotEmpty() && out[0].w.id == lists[0][0].w.id) {
+            out[0] = out[0].copy(tag = "Today, Bing daily")
+        }
+        out
     }
 
     /** Random starting page so auto-change doesn't keep drawing from page one. */
@@ -55,7 +122,7 @@ object Feed {
     private fun ghPaths(src: Source): List<String> {
         val key = src.extra + "|" + src.sub
         ghTrees[key]?.let { return it }
-        val j = JSONObject(Net.text("https://api.github.com/repos/${src.extra}/git/trees/main?recursive=1"))
+        val j = JSONObject(Net.text("https://api.github.com/repos/${src.extra}/git/trees/HEAD?recursive=1"))
         val arr = j.getJSONArray("tree")
         val list = ArrayList<String>()
         for (i in 0 until arr.length()) {
@@ -63,7 +130,7 @@ object Feed {
             if (o.optString("type") != "blob") continue
             val p = o.getString("path")
             if (!p.startsWith(src.sub) || p.startsWith("animated/")) continue
-            if (!ghImg.containsMatchIn(p)) continue
+            if (!ghImg.containsMatchIn(p) || ghJunk.containsMatchIn(p)) continue
             if (o.optLong("size", 0) > 15_000_000) continue
             list += p
         }
@@ -80,7 +147,7 @@ object Feed {
         if (from >= all.size) return Page(emptyList(), null)
         val slice = all.subList(from, minOf(all.size, from + GH_PAGE))
         val out = slice.map { p ->
-            val raw = "https://raw.githubusercontent.com/${src.extra}/main/" + Uri.encode(p, "/")
+            val raw = "https://raw.githubusercontent.com/${src.extra}/HEAD/" + Uri.encode(p, "/")
             // Small server-side resize so the grid doesn't download multi-MB originals.
             val thumb = "https://wsrv.nl/?w=360&h=640&fit=cover&output=jpg&q=70&url=" +
                 URLEncoder.encode(raw, "UTF-8")

@@ -35,6 +35,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -92,21 +94,22 @@ object Thumbs {
     }
     private val gate = Semaphore(4)
 
-    suspend fun get(url: String): Bitmap? {
-        cache.get(url)?.let { return it }
+    suspend fun get(url: String, target: Int = 360): Bitmap? {
+        val key = "$url@$target"
+        cache.get(key)?.let { return it }
         return gate.withPermit {
-            cache.get(url) ?: withContext(Dispatchers.IO) {
+            cache.get(key) ?: withContext(Dispatchers.IO) {
                 try {
                     val b = Net.bytes(url)
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(b, 0, b.size, bounds)
                     var s = 1
-                    while (bounds.outWidth / (s * 2) >= 360) s *= 2
+                    while (bounds.outWidth / (s * 2) >= target) s *= 2
                     val o = BitmapFactory.Options().apply {
                         inSampleSize = s
                         inPreferredConfig = Bitmap.Config.RGB_565
                     }
-                    BitmapFactory.decodeByteArray(b, 0, b.size, o)?.also { cache.put(url, it) }
+                    BitmapFactory.decodeByteArray(b, 0, b.size, o)?.also { cache.put(key, it) }
                 } catch (_: Exception) {
                     null
                 }
@@ -117,22 +120,37 @@ object Thumbs {
 
 @Composable
 fun Root() {
+    val ctx = LocalContext.current
+    val pr = remember { Prefs(ctx) }
     var detail by remember { mutableStateOf<Wall?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var showReddit by remember { mutableStateOf(pr.showReddit) }
 
     Box(Modifier.fillMaxSize()) {
-        Home(onOpen = { detail = it }, onSettings = { settings = true })
-        if (settings) Settings(onBack = { settings = false })
+        Home(showReddit = showReddit, onOpen = { detail = it }, onSettings = { settings = true })
+        if (settings) {
+            Settings(
+                showReddit = showReddit,
+                onShowReddit = { showReddit = it; pr.showReddit = it },
+                onBack = { settings = false },
+            )
+        }
         detail?.let { w -> Detail(w, onClose = { detail = null }) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
+fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     var srcId by rememberSaveable { mutableStateOf(Sources.all[0].id) }
     var sort by rememberSaveable { mutableStateOf(Sort.HOT) }
+    val featured by produceState<List<HeroItem>?>(null) { value = Feed.featured() }
+    var lastGh by rememberSaveable { mutableStateOf("gh-aes") }
     val src = Sources.byId(srcId)
+    val visible = remember(showReddit) { Sources.all.filter { showReddit || it.kind != Kind.REDDIT } }
+    LaunchedEffect(showReddit) {
+        if (!showReddit && Sources.byId(srcId).kind == Kind.REDDIT) srcId = Sources.all[0].id
+    }
 
     val items = remember { mutableStateListOf<Wall>() }
     var after by remember { mutableStateOf<String?>(null) }
@@ -186,7 +204,7 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chalchitra") },
+                title = { Text("চালচিত্র") },
                 actions = {
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings, for the control freaks")
@@ -200,12 +218,33 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(Sources.all, key = { it.id }) { s ->
+                items(visible.filter { it.kind != Kind.GITHUB }, key = { it.id }) { s ->
                     FilterChip(
                         selected = s.id == srcId,
                         onClick = { srcId = s.id },
                         label = { Text(s.label) },
                     )
+                }
+                item(key = "github-group") {
+                    FilterChip(
+                        selected = src.kind == Kind.GITHUB,
+                        onClick = { if (src.kind != Kind.GITHUB) srcId = lastGh },
+                        label = { Text("GitHub repos") },
+                    )
+                }
+            }
+            if (src.kind == Kind.GITHUB) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(Sources.github, key = { it.id }) { s ->
+                        FilterChip(
+                            selected = s.id == srcId,
+                            onClick = { srcId = s.id; lastGh = s.id },
+                            label = { Text(s.label) },
+                        )
+                    }
                 }
             }
             if (src.kind == Kind.REDDIT) {
@@ -229,6 +268,9 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "hero") {
+                    Hero(featured, onOpen)
+                }
                 itemsIndexed(items, key = { _, w -> w.id }) { i, w ->
                     if (i >= items.size - 6) LaunchedEffect(items.size) { more() }
                     val press = remember { MutableInteractionSource() }
@@ -276,6 +318,82 @@ fun Home(onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun Hero(items: List<HeroItem>?, onOpen: (Wall) -> Unit) {
+    if (items != null && items.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Text(
+            "বাছাই  ·  Featured",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        Text(
+            "A mixed bag, picked by an algorithm with opinions",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        if (items == null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(420.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+        } else {
+            val pager = rememberPagerState { items.size }
+            HorizontalPager(
+                state = pager,
+                contentPadding = PaddingValues(end = 56.dp),
+                pageSpacing = 12.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) { i -> HeroCard(items[i], onOpen) }
+        }
+    }
+}
+
+@Composable
+private fun HeroCard(item: HeroItem, onOpen: (Wall) -> Unit) {
+    val w = item.w
+    val big = item.img
+    val bm by produceState<Bitmap?>(null, big) { value = Thumbs.get(big, 720) }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(420.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable { onOpen(w) },
+    ) {
+        bm?.let {
+            Image(
+                bitmap = remember(it) { it.asImageBitmap() },
+                contentDescription = w.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        ) {
+            Text(item.tag, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f))
+            Text(
+                if (w.title.startsWith("Wallhaven ")) "Wallhaven pick" else w.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -382,7 +500,7 @@ private val targets = listOf(0 to "Home", 1 to "Lock", 2 to "Both")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun Settings(onBack: () -> Unit) {
+fun Settings(showReddit: Boolean, onShowReddit: (Boolean) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val pr = remember { Prefs(ctx) }
     val scope = rememberCoroutineScope()
@@ -453,7 +571,19 @@ fun Settings(onBack: () -> Unit) {
 
                 Text("Where the pretty things come from", style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Sources.all.forEach { s ->
+                    val ghIds = Sources.github.map { it.id }.toSet()
+                    FilterChip(
+                        selected = srcs.any { it in ghIds },
+                        onClick = {
+                            val n = if (srcs.any { it in ghIds }) srcs - ghIds else srcs + ghIds
+                            if (n.isNotEmpty()) {
+                                srcs = n
+                                pr.sources = n
+                            }
+                        },
+                        label = { Text("All GitHub repos") },
+                    )
+                    Sources.all.filter { it.kind != Kind.GITHUB && (showReddit || it.kind != Kind.REDDIT) }.forEach { s ->
                         FilterChip(
                             selected = s.id in srcs,
                             onClick = {
@@ -467,6 +597,12 @@ fun Settings(onBack: () -> Unit) {
                         )
                     }
                 }
+
+                SwitchRow(
+                    "Show Reddit sources",
+                    "Often blocked on phones. Enable at your own optimism",
+                    showReddit,
+                ) { onShowReddit(it) }
 
                 SwitchRow("Dim status bar", "So your clock stays readable over that sunset you picked", dim) {
                     dim = it

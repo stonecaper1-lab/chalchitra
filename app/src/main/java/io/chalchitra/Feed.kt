@@ -1,7 +1,10 @@
 package io.chalchitra
 
+import android.net.Uri
 import java.io.IOException
+import java.net.URLEncoder
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 data class Wall(
@@ -19,16 +22,76 @@ object Feed {
 
     private val direct = Regex("\\.(jpe?g|png|webp)(\\?.*)?$", RegexOption.IGNORE_CASE)
 
-    /** Sources whose cursor is a plain page number, so auto-change can jump to a random page. */
-    fun isPaged(k: Kind) = k == Kind.WALLHAVEN || k == Kind.ARTIC || k == Kind.PICSUM
+    private const val GH_PAGE = 30
+    private val ghTrees = HashMap<String, List<String>>()
+    private val ghSeed = java.util.Random().nextLong()
+    private val ghImg = Regex("\\.(jpe?g|png|webp)$", RegexOption.IGNORE_CASE)
 
-    fun load(src: Source, sort: Sort, after: String?): Page = when (src.kind) {
-        Kind.BING -> bing()
-        Kind.REDDIT -> reddit(src, sort, after)
-        Kind.WALLHAVEN -> wallhaven(src, after)
-        Kind.PICSUM -> picsum(after)
-        Kind.APOD -> apod()
-        Kind.ARTIC -> artic(after)
+    fun load(src: Source, sort: Sort, after: String?): Page = try {
+        when (src.kind) {
+            Kind.BING -> bing()
+            Kind.REDDIT -> reddit(src, sort, after)
+            Kind.WALLHAVEN -> wallhaven(src, after)
+            Kind.PICSUM -> picsum(after)
+            Kind.APOD -> apod()
+            Kind.ARTIC -> artic(after)
+            Kind.GITHUB -> github(src, after)
+        }
+    } catch (e: JSONException) {
+        throw IOException("${src.label} sent something unreadable. Try another source.")
+    }
+
+    /** Random starting page so auto-change doesn't keep drawing from page one. */
+    fun startCursor(src: Source): String? = when (src.kind) {
+        Kind.WALLHAVEN, Kind.ARTIC, Kind.PICSUM -> (1..8).random().toString()
+        Kind.GITHUB -> {
+            val pages = (ghPaths(src).size + GH_PAGE - 1) / GH_PAGE
+            (1..maxOf(pages, 1)).random().toString()
+        }
+        else -> null
+    }
+
+    @Synchronized
+    private fun ghPaths(src: Source): List<String> {
+        val key = src.extra + "|" + src.sub
+        ghTrees[key]?.let { return it }
+        val j = JSONObject(Net.text("https://api.github.com/repos/${src.extra}/git/trees/main?recursive=1"))
+        val arr = j.getJSONArray("tree")
+        val list = ArrayList<String>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optString("type") != "blob") continue
+            val p = o.getString("path")
+            if (!p.startsWith(src.sub) || p.startsWith("animated/")) continue
+            if (!ghImg.containsMatchIn(p)) continue
+            if (o.optLong("size", 0) > 15_000_000) continue
+            list += p
+        }
+        if (list.isEmpty()) throw IOException("No images found in ${src.extra}")
+        val out = list.shuffled(java.util.Random(ghSeed))
+        ghTrees[key] = out
+        return out
+    }
+
+    private fun github(src: Source, after: String?): Page {
+        val page = (after?.toIntOrNull() ?: 1).coerceAtLeast(1)
+        val all = ghPaths(src)
+        val from = (page - 1) * GH_PAGE
+        if (from >= all.size) return Page(emptyList(), null)
+        val slice = all.subList(from, minOf(all.size, from + GH_PAGE))
+        val out = slice.map { p ->
+            val raw = "https://raw.githubusercontent.com/${src.extra}/main/" + Uri.encode(p, "/")
+            // Small server-side resize so the grid doesn't download multi-MB originals.
+            val thumb = "https://wsrv.nl/?w=360&h=640&fit=cover&output=jpg&q=70&url=" +
+                URLEncoder.encode(raw, "UTF-8")
+            Wall(
+                "gh" + Integer.toHexString("${src.extra}/$p".hashCode()),
+                p.substringAfterLast('/').substringBeforeLast('.'),
+                thumb,
+                raw,
+            )
+        }
+        return Page(out, if (from + GH_PAGE < all.size) (page + 1).toString() else null)
     }
 
     private fun bing(): Page {
@@ -124,12 +187,14 @@ object Feed {
             "https://api.reddit.com" to "",
         )) {
             try {
-                return Net.text("$host/r/$sub/$kind$ext?$query&raw_json=1", Net.BROWSER_UA)
+                val t = Net.text("$host/r/$sub/$kind$ext?$query&raw_json=1", Net.BROWSER_UA)
+                if (!t.trimStart().startsWith("{")) throw IOException("Reddit is showing a bot check")
+                return t
             } catch (e: IOException) {
                 err = e
             }
         }
-        throw err ?: IOException("Reddit unreachable")
+        throw IOException("Reddit is blocking this device right now. Use another source, there are plenty.")
     }
 
     private fun reddit(src: Source, sort: Sort, after: String?): Page {

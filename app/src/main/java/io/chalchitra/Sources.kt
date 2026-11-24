@@ -1,6 +1,6 @@
 package io.chalchitra
 
-enum class Kind { REDDIT, BING, WALLHAVEN, PICSUM, APOD, ARTIC }
+enum class Kind { REDDIT, BING, WALLHAVEN, PICSUM, APOD, ARTIC, GITHUB }
 
 enum class Sort(val label: String) {
     HOT("Hot"),
@@ -9,7 +9,10 @@ enum class Sort(val label: String) {
     ALL("All time"),
 }
 
-/** [portrait] = keep only tall images (Reddit only). [extra] = raw query tail for Wallhaven. */
+/**
+ * [portrait] = keep only tall images (Reddit only).
+ * [extra] = raw query tail for Wallhaven, or "owner/repo" for GitHub ([sub] is then a path prefix).
+ */
 data class Source(
     val id: String,
     val label: String,
@@ -30,6 +33,14 @@ object Sources {
         Source("picsum", "Photos", Kind.PICSUM),
         Source("apod", "NASA APOD", Kind.APOD),
         Source("artic", "Art", Kind.ARTIC),
+        Source("gh-aes", "Aesthetic", Kind.GITHUB, "images/", extra = "D3Ext/aesthetic-wallpapers"),
+        Source("gh-sc", "Scopic all", Kind.GITHUB, "", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-nature", "Scopic nature", Kind.GITHUB, "nature/", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-space", "Scopic space", Kind.GITHUB, "space/", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-anime", "Scopic anime", Kind.GITHUB, "anime/", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-cyber", "Scopic cyberpunk", Kind.GITHUB, "cyberpunk/", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-mono", "Scopic mono", Kind.GITHUB, "monochrome/", extra = "michaelScopic/Wallpapers"),
+        Source("gh-sc-abstract", "Scopic abstract", Kind.GITHUB, extra = "michaelScopic/Wallpapers|abstract/"),
         Source("MobileWallpaper", "Mobile", Kind.REDDIT, "MobileWallpaper"),
         Source("phonewallpapers", "Phone", Kind.REDDIT, "phonewallpapers"),
         Source("iWallpaper", "iWallpaper", Kind.REDDIT, "iWallpaper"),

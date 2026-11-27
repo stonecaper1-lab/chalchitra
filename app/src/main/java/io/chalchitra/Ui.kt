@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -204,7 +205,18 @@ fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("চালচিত্র") },
+                title = {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Chalchitra")
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "চালচিত্র",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(bottom = 3.dp),
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings, for the control freaks")
@@ -326,11 +338,16 @@ fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
 private fun Hero(items: List<HeroItem>?, onOpen: (Wall) -> Unit) {
     if (items != null && items.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        Text(
-            "বাছাই  ·  Featured",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(bottom = 4.dp)) {
+            Text("Featured", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "বাছাই",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
         Text(
             "A mixed bag, picked by an algorithm with opinions",
             style = MaterialTheme.typography.bodySmall,

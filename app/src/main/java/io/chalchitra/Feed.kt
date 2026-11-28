@@ -48,6 +48,7 @@ object Feed {
             Kind.APOD -> apod()
             Kind.ARTIC -> artic(after)
             Kind.GITHUB -> github(src, after)
+            Kind.PIXABAY -> pixabay(src, after)
         }
     } catch (e: JSONException) {
         throw IOException("${src.label} sent something unreadable. Try another source.")
@@ -110,7 +111,7 @@ object Feed {
 
     /** Random starting page so auto-change doesn't keep drawing from page one. */
     fun startCursor(src: Source): String? = when (src.kind) {
-        Kind.WALLHAVEN, Kind.ARTIC, Kind.PICSUM -> (1..8).random().toString()
+        Kind.WALLHAVEN, Kind.ARTIC, Kind.PICSUM, Kind.PIXABAY -> (1..8).random().toString()
         Kind.GITHUB -> {
             val pages = (ghPaths(src).size + GH_PAGE - 1) / GH_PAGE
             (1..maxOf(pages, 1)).random().toString()
@@ -159,6 +160,31 @@ object Feed {
             )
         }
         return Page(out, if (from + GH_PAGE < all.size) (page + 1).toString() else null)
+    }
+
+    /** Set from Settings (and Auto) before any Pixabay call. */
+    @Volatile
+    var pixabayKey: String = ""
+
+    private fun pixabay(src: Source, after: String?): Page {
+        val key = pixabayKey.trim()
+        if (key.isEmpty()) throw IOException("Add your free Pixabay API key in Settings first.")
+        val page = after?.toIntOrNull() ?: 1
+        val url = "https://pixabay.com/api/?key=" + URLEncoder.encode(key, "UTF-8") +
+            "&image_type=photo&orientation=vertical&min_height=1280&safesearch=true&order=popular" +
+            "&per_page=40&page=$page" + src.extra
+        val j = JSONObject(Net.text(url))
+        val hits = j.getJSONArray("hits")
+        val out = ArrayList<Wall>(hits.length())
+        for (i in 0 until hits.length()) {
+            val o = hits.getJSONObject(i)
+            val full = o.optString("largeImageURL")
+            val thumb = o.optString("webformatURL")
+            if (full.isEmpty() || thumb.isEmpty()) continue
+            out += Wall("px" + o.getLong("id"), o.optString("tags").replace(",", " ·"), thumb, full)
+        }
+        val total = j.optInt("totalHits", 0)
+        return Page(out, if (page * 40 < total) (page + 1).toString() else null)
     }
 
     private fun bing(): Page {

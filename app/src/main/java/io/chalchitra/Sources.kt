@@ -1,6 +1,6 @@
 package io.chalchitra
 
-enum class Kind { REDDIT, BING, WALLHAVEN, PICSUM, APOD, ARTIC, GITHUB }
+enum class Kind { REDDIT, BING, WALLHAVEN, PICSUM, APOD, ARTIC, GITHUB, PIXABAY }
 
 enum class Sort(val label: String) {
     HOT("Hot"),
@@ -33,6 +33,9 @@ object Sources {
         Source("picsum", "Photos", Kind.PICSUM),
         Source("apod", "NASA APOD", Kind.APOD),
         Source("artic", "Art", Kind.ARTIC),
+        Source("pixabay", "Pixabay", Kind.PIXABAY),
+        Source("pixabay-nature", "Pixabay nature", Kind.PIXABAY, extra = "&category=nature"),
+        Source("pixabay-bg", "Pixabay backgrounds", Kind.PIXABAY, extra = "&category=backgrounds"),
         Source("gh-aes", "Aesthetic", Kind.GITHUB, "images/", extra = "D3Ext/aesthetic-wallpapers"),
         Source("gh-sc", "Scopic all", Kind.GITHUB, "", extra = "michaelScopic/Wallpapers"),
         Source("gh-sc-nature", "Scopic nature", Kind.GITHUB, "nature/", extra = "michaelScopic/Wallpapers"),

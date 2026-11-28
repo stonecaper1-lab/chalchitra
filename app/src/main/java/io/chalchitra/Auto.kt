@@ -13,8 +13,10 @@ object Auto {
     /** Picks one new wallpaper from the enabled sources and applies it. */
     fun runOnce(ctx: Context): Boolean {
         val pr = Prefs(ctx)
+        Feed.pixabayKey = pr.pixabayKey
         val srcs = pr.sources.map { Sources.byId(it) }
             .filter { pr.showReddit || it.kind != Kind.REDDIT }
+            .filter { pr.pixabayKey.isNotBlank() || it.kind != Kind.PIXABAY }
             .ifEmpty { listOf(Sources.all[0]) }
             .shuffled()
         for (s in srcs) {
@@ -72,14 +74,17 @@ class AutoJob : JobService() {
     companion object {
         const val ID = 1
 
-        fun schedule(ctx: Context, minutes: Int) {
+        /** Returns false instead of crashing if the system refuses the job. */
+        fun schedule(ctx: Context, minutes: Int): Boolean = try {
             val info = JobInfo.Builder(ID, ComponentName(ctx, AutoJob::class.java))
                 .setPeriodic(minutes * 60_000L)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                 .setRequiresBatteryNotLow(true)
                 .setPersisted(true)
                 .build()
-            ctx.getSystemService(JobScheduler::class.java).schedule(info)
+            ctx.getSystemService(JobScheduler::class.java).schedule(info) == JobScheduler.RESULT_SUCCESS
+        } catch (_: Exception) {
+            false
         }
 
         fun cancel(ctx: Context) {

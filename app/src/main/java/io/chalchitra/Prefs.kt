@@ -23,6 +23,11 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("tg", 2)
         set(v) = sp.edit().putInt("tg", v).apply()
 
+    /** Free key from pixabay.com/api/docs, entered by the user. Never hardcoded. */
+    var pixabayKey: String
+        get() = sp.getString("pxk", "")!!.trim()
+        set(v) = sp.edit().putString("pxk", v.trim()).apply()
+
     var showReddit: Boolean
         get() = sp.getBoolean("rd", false)
         set(v) = sp.edit().putBoolean("rd", v).apply()

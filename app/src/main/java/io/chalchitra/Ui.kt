@@ -52,6 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -126,13 +127,16 @@ fun Root() {
     var detail by remember { mutableStateOf<Wall?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var showReddit by remember { mutableStateOf(pr.showReddit) }
+    var pxKey by remember { mutableStateOf(pr.pixabayKey) }
 
     Box(Modifier.fillMaxSize()) {
-        Home(showReddit = showReddit, onOpen = { detail = it }, onSettings = { settings = true })
+        Home(showReddit = showReddit, hasPixabay = pxKey.isNotBlank(), onOpen = { detail = it }, onSettings = { settings = true })
         if (settings) {
             Settings(
                 showReddit = showReddit,
                 onShowReddit = { showReddit = it; pr.showReddit = it },
+                pixabayKey = pxKey,
+                onPixabayKey = { pxKey = it; pr.pixabayKey = it; Feed.pixabayKey = it },
                 onBack = { settings = false },
             )
         }
@@ -142,15 +146,18 @@ fun Root() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
+fun Home(showReddit: Boolean, hasPixabay: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     var srcId by rememberSaveable { mutableStateOf(Sources.all[0].id) }
     var sort by rememberSaveable { mutableStateOf(Sort.HOT) }
     val featured by produceState<List<HeroItem>?>(null) { value = Feed.featured() }
     var lastGh by rememberSaveable { mutableStateOf("gh-aes") }
     val src = Sources.byId(srcId)
-    val visible = remember(showReddit) { Sources.all.filter { showReddit || it.kind != Kind.REDDIT } }
-    LaunchedEffect(showReddit) {
-        if (!showReddit && Sources.byId(srcId).kind == Kind.REDDIT) srcId = Sources.all[0].id
+    val visible = remember(showReddit, hasPixabay) {
+        Sources.all.filter { (showReddit || it.kind != Kind.REDDIT) && (hasPixabay || it.kind != Kind.PIXABAY) }
+    }
+    LaunchedEffect(showReddit, hasPixabay) {
+        val k = Sources.byId(srcId).kind
+        if ((!showReddit && k == Kind.REDDIT) || (!hasPixabay && k == Kind.PIXABAY)) srcId = Sources.all[0].id
     }
 
     val items = remember { mutableStateListOf<Wall>() }
@@ -205,18 +212,7 @@ fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("Chalchitra")
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "চালচিত্র",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(bottom = 3.dp),
-                        )
-                    }
-                },
+                title = { Text("Chalchitra") },
                 actions = {
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings, for the control freaks")
@@ -338,16 +334,11 @@ fun Home(showReddit: Boolean, onOpen: (Wall) -> Unit, onSettings: () -> Unit) {
 private fun Hero(items: List<HeroItem>?, onOpen: (Wall) -> Unit) {
     if (items != null && items.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(bottom = 4.dp)) {
-            Text("Featured", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "বাছাই",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-        }
+        Text(
+            "Featured",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
         Text(
             "A mixed bag, picked by an algorithm with opinions",
             style = MaterialTheme.typography.bodySmall,
@@ -517,7 +508,13 @@ private val targets = listOf(0 to "Home", 1 to "Lock", 2 to "Both")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun Settings(showReddit: Boolean, onShowReddit: (Boolean) -> Unit, onBack: () -> Unit) {
+fun Settings(
+    showReddit: Boolean,
+    onShowReddit: (Boolean) -> Unit,
+    pixabayKey: String,
+    onPixabayKey: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     val ctx = LocalContext.current
     val pr = remember { Prefs(ctx) }
     val scope = rememberCoroutineScope()
@@ -552,9 +549,20 @@ fun Settings(showReddit: Boolean, onShowReddit: (Boolean) -> Unit, onBack: () ->
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 SwitchRow("Auto change", "Because tapping twice a day is exhausting. Runs only with network and battery not low", auto) {
-                    auto = it
-                    pr.autoOn = it
-                    if (it) AutoJob.schedule(ctx, interval) else AutoJob.cancel(ctx)
+                    if (it) {
+                        if (AutoJob.schedule(ctx, interval)) {
+                            auto = true
+                            pr.autoOn = true
+                        } else {
+                            auto = false
+                            pr.autoOn = false
+                            Toast.makeText(ctx, "Android refused to schedule the job.", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        auto = false
+                        pr.autoOn = false
+                        AutoJob.cancel(ctx)
+                    }
                 }
 
                 Text("Change every (commitment issues welcome)", style = MaterialTheme.typography.titleSmall)
@@ -600,7 +608,10 @@ fun Settings(showReddit: Boolean, onShowReddit: (Boolean) -> Unit, onBack: () ->
                         },
                         label = { Text("All GitHub repos") },
                     )
-                    Sources.all.filter { it.kind != Kind.GITHUB && (showReddit || it.kind != Kind.REDDIT) }.forEach { s ->
+                    Sources.all.filter {
+                        it.kind != Kind.GITHUB && (showReddit || it.kind != Kind.REDDIT) &&
+                            (pixabayKey.isNotBlank() || it.kind != Kind.PIXABAY)
+                    }.forEach { s ->
                         FilterChip(
                             selected = s.id in srcs,
                             onClick = {
@@ -620,6 +631,15 @@ fun Settings(showReddit: Boolean, onShowReddit: (Boolean) -> Unit, onBack: () ->
                     "Often blocked on phones. Enable at your own optimism",
                     showReddit,
                 ) { onShowReddit(it) }
+
+                OutlinedTextField(
+                    value = pixabayKey,
+                    onValueChange = onPixabayKey,
+                    label = { Text("Pixabay API key (optional, free)") },
+                    supportingText = { Text("Get one at pixabay.com/api/docs. Stays on this phone and unlocks the Pixabay chips.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 SwitchRow("Dim status bar", "So your clock stays readable over that sunset you picked", dim) {
                     dim = it

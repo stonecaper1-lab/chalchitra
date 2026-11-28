@@ -24,6 +24,7 @@ object Net {
         if (code !in 200..299) {
             throw IOException(
                 when (code) {
+                    400 -> "Bad request (HTTP 400). If this is Pixabay, check your API key in Settings."
                     403 -> "Server said no (HTTP 403). Try another source, there are plenty."
                     404 -> "Not found (HTTP 404). That repo or page may be gone."
                     429 -> "Slow down (HTTP 429). Try again in a minute."
